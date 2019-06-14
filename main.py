@@ -32,7 +32,7 @@ import random
 import tensorflow as tf
 
 from data_generator import DataGenerator
-from maml import MAML
+from maml import MAML, MAML_S
 from tensorflow.python.platform import flags
 
 FLAGS = flags.FLAGS
@@ -58,6 +58,7 @@ flags.DEFINE_integer('num_filters', 64, 'number of filters for conv nets -- 32 f
 flags.DEFINE_bool('conv', True, 'whether or not to use a convolutional network, only applicable in some cases')
 flags.DEFINE_bool('max_pool', False, 'Whether or not to use max pooling rather than strided convolutions')
 flags.DEFINE_bool('stop_grad', False, 'if True, do not use second derivatives in meta-optimization (for speed)')
+flags.DEFINE_bool('new_model', False, 'if True, use the modified MAML')
 
 ## Logging, saving, and testing options
 flags.DEFINE_bool('log', True, 'if false, do not log summaries, for debugging code.')
@@ -284,7 +285,11 @@ def main():
         tf_data_load = False
         input_tensors = None
 
-    model = MAML(dim_input, dim_output, test_num_updates=test_num_updates)
+    if FLAGS.new_model:
+        model = MAML_S(dim_input, dim_output, test_num_updates=test_num_updates)
+    else:
+        model = MAML(dim_input, dim_output, test_num_updates=test_num_updates)\
+
     if FLAGS.train or not tf_data_load:
         model.construct_model(input_tensors=input_tensors, prefix='metatrain_')
     if tf_data_load:

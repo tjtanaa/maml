@@ -23,7 +23,7 @@ def get_images(paths, labels, nb_samples=None, shuffle=True):
     return images
 
 ## Network helpers
-def conv_block(inp, cweight, bweight, reuse, scope, activation=tf.nn.relu, max_pool_pad='VALID', residual=False):
+def conv_block(inp, cweight, bweight, reuse, scope, activation=tf.nn.relu, max_pool_pad='SAME', residual=False):
     """ Perform, conv, batch norm, nonlinearity, and max pool """
     stride, no_stride = [1,2,2,1], [1,1,1,1]
 
@@ -46,6 +46,19 @@ def normalize(inp, activation, reuse, scope):
             return activation(inp)
         else:
             return inp
+
+def deconv_block(inp, cweight, bweight, reuse, scope, activation=tf.nn.relu, max_pool_pad='SAME', residual=False, output_shape=None):
+    """ Perform, deconv, batch norm, nonlinearity, and max pool """
+    stride, no_stride = [1,2,2,1], [1,1,1,1]
+
+    if FLAGS.max_pool:
+        deconv_output = tf.nn.conv2d_transpose(inp, cweight, output_shape, no_stride, 'SAME') + bweight
+    else:
+        deconv_output = tf.nn.conv2d_transpose(inp, cweight, output_shape,  stride, 'SAME') + bweight
+    normed = normalize(deconv_output, activation, reuse, scope)
+    if FLAGS.max_pool:
+        normed = tf.nn.max_pool(normed, stride, stride, max_pool_pad)
+    return normed
 
 ## Loss functions
 def mse(pred, label):
