@@ -309,7 +309,7 @@ class MAML_S:
                 # grads = tf.gradients(task_lossa, list(weights.values()))
                 last_layer_grad = tf.gradients(task_lossa, task_outputa[-1])
                 last_layer_target = task_outputa[-1] -self.update_lr*last_layer_grad[0]
-                targets = self.backward(last_layer_grad, weights, reuse=reuse, forward_activations=task_outputa)
+                targets = self.backward(last_layer_target, weights, reuse=reuse, forward_activations=task_outputa)
                 # print('len of targets: {}'.format(len(targets)))
                 dtargets = [self.loss_func(task_outputa[i], targets[i]) for i in range(len(task_outputa))]
                 # print('len of dtargets: {}'.format(len(dtargets)))
@@ -320,14 +320,16 @@ class MAML_S:
                 updated_weights = ['conv1', 'conv2' ,'conv3' ,'conv4' ,'w5']
                 updated_biases = ['b1','b2','b3','b4','b5']
                 grads_weights = [tf.gradients(dtargets[i], weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
+                print("Before grads_biases")
                 grads_biases = [tf.gradients(dtargets[i], weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
+                print("After grads_biases")
                 grads = grads_weights + grads_biases
                 updated_parameters = updated_weights + updated_biases
                 if FLAGS.stop_grad:
                     grads = [tf.stop_gradient(grad) for grad in grads]
                 # gradients = dict(zip(weights.keys(), grads))
                 gradients = dict(zip(updated_parameters, grads))
-                # print(gradients)
+                print(gradients)
                 # fast_weights = dict(zip(weights.keys(), [tf.add(weights[key], tf.scalar_mul(-self.update_lr, gradients[key])) if key in updated_parameters else weights[key] for key in weights.keys()]))
                 fast_weights = dict(zip(weights.keys(), [weights[key] - self.update_lr*gradients[key][0] if key in updated_parameters else weights[key] for key in weights.keys()]))
 
@@ -340,28 +342,34 @@ class MAML_S:
                     task_lossa = self.loss_func(task_outputa[-1], labela)
                     last_layer_grad = tf.gradients(task_lossa, task_outputa[-1])
                     last_layer_target = task_outputa[-1] -self.update_lr*last_layer_grad[0]
-                    targets = self.backward(last_layer_grad, weights, reuse=True, forward_activations=task_outputa)
+                    targets = self.backward(last_layer_target, weights, reuse=True, forward_activations=task_outputa)
                     dtargets = [self.loss_func(task_outputa[i], targets[i]) for i in range(len(task_outputa))]
                     # print(len(dtargets))
 
                     # weights to be updated
-                    # updated_weights = ['conv1', 'conv2' ,'conv3' ,'conv4' ,'w5']
-                    # updated_biases = ['b1','b2','b3','b4','b5']
+                    updated_weights = ['conv1', 'conv2' ,'conv3' ,'conv4' ,'w5']
+                    updated_biases = ['b1','b2','b3','b4','b5']
                     grads_weights = [tf.gradients(dtargets[i], weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
+                    print("Before grads_biases")
                     grads_biases = [tf.gradients(dtargets[i], weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
+                    print("After grads_biases")
                     grads = grads_weights + grads_biases
                     updated_parameters = updated_weights + updated_biases
                     if FLAGS.stop_grad:
                         grads = [tf.stop_gradient(grad) for grad in grads]
                     # gradients = dict(zip(weights.keys(), grads))
+                    print('Before zipping gradients')
                     gradients = dict(zip(updated_parameters, grads))
                     # print(gradients)
                     # fast_weights = dict(zip(weights.keys(), [tf.add(weights[key], tf.scalar_mul(-self.update_lr, gradients[key])) if key in updated_parameters else weights[key] for key in weights.keys()]))
+                    print('Before computing fast_weights')
                     fast_weights = dict(zip(fast_weights.keys(), [fast_weights[key] - self.update_lr*gradients[key][0] if key in updated_parameters else fast_weights[key] for key in fast_weights.keys()]))
-
+                    print('Before inputb forward pass')
                     output = self.forward(inputb, fast_weights, reuse=True)
                     task_outputbs.append(output[-1])
+                    print('Before computing losses on dataset B')
                     task_lossesb.append(self.loss_func(output[-1], labelb))
+                    print('After computing losses on dataset B')
 
 
                     # loss = self.loss_func(self.forward(inputa, fast_weights, reuse=True)[-1], labela)
@@ -377,21 +385,31 @@ class MAML_S:
                 task_output = [task_outputa[-1], task_outputbs, task_lossa, task_lossesb]
 
                 if self.classification:
+                    print('Before classification accuracy learn')
                     task_accuracya = tf.contrib.metrics.accuracy(tf.argmax(tf.nn.softmax(task_outputa[-1]), 1), tf.argmax(labela, 1))
+                    print('After classification accuracy learn')
                     for j in range(num_updates):
+                        print('Before classification accuracy meta-learn')
                         task_accuraciesb.append(tf.contrib.metrics.accuracy(tf.argmax(tf.nn.softmax(task_outputbs[j]), 1), tf.argmax(labelb, 1)))
+                        print('After classification accuracy meta-learn')
                     task_output.extend([task_accuracya, task_accuraciesb])
 
+                print('Before returning task_output')
                 return task_output
 
             if FLAGS.norm is not 'None':
+                print('Before unused')
                 # to initialize the batch norm vars, might want to combine this, and not run idx 0 twice.
                 unused = task_metalearn((self.inputa[0], self.inputb[0], self.labela[0], self.labelb[0]), False)
+                print('After unused')
 
             out_dtype = [tf.float32, [tf.float32]*num_updates, tf.float32, [tf.float32]*num_updates]
             if self.classification:
                 out_dtype.extend([tf.float32, [tf.float32]*num_updates])
+
+            print('Before map_fn')
             result = tf.map_fn(task_metalearn, elems=(self.inputa, self.inputb, self.labela, self.labelb), dtype=out_dtype, parallel_iterations=FLAGS.meta_batch_size)
+            print('After map_fn')
             if self.classification:
                 outputas, outputbs, lossesa, lossesb, accuraciesa, accuraciesb = result
             else:
@@ -399,6 +417,7 @@ class MAML_S:
 
         ## Performance & Optimization
         if 'train' in prefix:
+            print('Performance and Optimization')
             self.total_loss1 = total_loss1 = tf.reduce_sum(lossesa) / tf.to_float(FLAGS.meta_batch_size)
             self.total_losses2 = total_losses2 = [tf.reduce_sum(lossesb[j]) / tf.to_float(FLAGS.meta_batch_size) for j in range(num_updates)]
             # after the map_fn
@@ -408,12 +427,15 @@ class MAML_S:
                 self.total_accuracies2 = total_accuracies2 = [tf.reduce_sum(accuraciesb[j]) / tf.to_float(FLAGS.meta_batch_size) for j in range(num_updates)]
             self.pretrain_op = tf.train.AdamOptimizer(self.meta_lr).minimize(total_loss1)
 
+            print('After Accuracy Computation')
             if FLAGS.metatrain_iterations > 0:
                 optimizer = tf.train.AdamOptimizer(self.meta_lr)
                 self.gvs = gvs = optimizer.compute_gradients(self.total_losses2[FLAGS.num_updates-1])
                 if FLAGS.datasource == 'miniimagenet':
                     gvs = [(tf.clip_by_value(grad, -10, 10), var) for grad, var in gvs]
                 self.metatrain_op = optimizer.apply_gradients(gvs)
+
+            print('After Gradient Computation')
         else:
             self.metaval_total_loss1 = total_loss1 = tf.reduce_sum(lossesa) / tf.to_float(FLAGS.meta_batch_size)
             self.metaval_total_losses2 = total_losses2 = [tf.reduce_sum(lossesb[j]) / tf.to_float(FLAGS.meta_batch_size) for j in range(num_updates)]
