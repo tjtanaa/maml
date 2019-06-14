@@ -309,7 +309,7 @@ class MAML_S:
                 # grads = tf.gradients(task_lossa, list(weights.values()))
                 last_layer_grad = tf.gradients(task_lossa, task_outputa[-1])
                 last_layer_target = task_outputa[-1] -self.update_lr*last_layer_grad[0]
-                targets = self.backward(last_layer_grad, weights, reuse=reuse, forward_activations=task_outputa)
+                targets = self.backward(last_layer_target, weights, reuse=reuse, forward_activations=task_outputa)
                 # print('len of targets: {}'.format(len(targets)))
                 dtargets = [self.loss_func(task_outputa[i], targets[i]) for i in range(len(task_outputa))]
                 # print('len of dtargets: {}'.format(len(dtargets)))
@@ -327,7 +327,7 @@ class MAML_S:
                     grads = [tf.stop_gradient(grad) for grad in grads]
                 # gradients = dict(zip(weights.keys(), grads))
                 gradients = dict(zip(updated_parameters, grads))
-                # print(gradients)
+                print(gradients)
                 # fast_weights = dict(zip(weights.keys(), [tf.add(weights[key], tf.scalar_mul(-self.update_lr, gradients[key])) if key in updated_parameters else weights[key] for key in weights.keys()]))
                 fast_weights = dict(zip(weights.keys(), [weights[key] - self.update_lr*gradients[key][0] if key in updated_parameters else weights[key] for key in weights.keys()]))
 
@@ -340,7 +340,7 @@ class MAML_S:
                     task_lossa = self.loss_func(task_outputa[-1], labela)
                     last_layer_grad = tf.gradients(task_lossa, task_outputa[-1])
                     last_layer_target = task_outputa[-1] -self.update_lr*last_layer_grad[0]
-                    targets = self.backward(last_layer_grad, weights, reuse=True, forward_activations=task_outputa)
+                    targets = self.backward(last_layer_target, weights, reuse=True, forward_activations=task_outputa)
                     dtargets = [self.loss_func(task_outputa[i], targets[i]) for i in range(len(task_outputa))]
                     # print(len(dtargets))
 
