@@ -40,7 +40,6 @@ import subprocess
 
 os.environ["CUDA_VISIBLE_DEVICES"] = str(np.argmax([int(x.split()[2]) for x in subprocess.Popen("nvidia-smi -q -d Memory | grep -A4 GPU | grep Free", shell=True, stdout=subprocess.PIPE).stdout.readlines()]))
 
-
 FLAGS = flags.FLAGS
 
 ## Dataset/method options
@@ -303,10 +302,8 @@ def main():
     model.summ_op = tf.summary.merge_all()
 
     saver = loader = tf.train.Saver(tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES), max_to_keep=10)
-
     config = tf.ConfigProto()
     config.gpu_options.allow_growth = True
-
     sess = tf.InteractiveSession(config=config)
 
     if FLAGS.train == False:
