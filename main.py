@@ -234,7 +234,7 @@ def main():
             else:
                 test_num_updates = 10
         else:
-            test_num_updates = 10
+            test_num_updates = 2 #10
 
     if FLAGS.train == False:
         orig_meta_batch_size = FLAGS.meta_batch_size
