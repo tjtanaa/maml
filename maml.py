@@ -242,6 +242,7 @@ class MAML_S:
             self.dim_hidden = [40, 40]
             self.loss_func = mse
             self.forward = self.forward_fc
+            self.backward = self.backward_fc
             self.construct_weights = self.construct_fc_weights
         elif FLAGS.datasource == 'omniglot' or FLAGS.datasource == 'miniimagenet':
             self.loss_func = xent
@@ -317,8 +318,13 @@ class MAML_S:
                 # print(len(dtargets))
 
                 # weights to be updated
-                updated_weights = ['conv1', 'conv2' ,'conv3' ,'conv4' ,'w5']
-                updated_biases = ['b1','b2','b3','b4','b5']
+                if self.classification:
+                    updated_weights = ['conv1', 'conv2' ,'conv3' ,'conv4' ,'w5']
+                    updated_biases = ['b1','b2','b3','b4','b5']
+                else:
+                    updated_weights = ['w1', 'w2' ,'w3']
+                    updated_biases = ['b1','b2','b3']
+                print("@@@@@@@@@@@weights.keys(): {}".format(list(weights.keys())))
                 grads_weights = [tf.gradients(dtargets[i], weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
                 print("Before grads_biases")
                 grads_biases = [tf.gradients(dtargets[i], weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
@@ -342,16 +348,16 @@ class MAML_S:
                     task_lossa = self.loss_func(task_outputa[-1], labela)
                     last_layer_grad = tf.gradients(task_lossa, task_outputa[-1])
                     last_layer_target = task_outputa[-1] -self.update_lr*last_layer_grad[0]
-                    targets = self.backward(last_layer_target, weights, reuse=True, forward_activations=task_outputa)
+                    targets = self.backward(last_layer_target, fast_weights, reuse=True, forward_activations=task_outputa)
                     dtargets = [self.loss_func(task_outputa[i], targets[i]) for i in range(len(task_outputa))]
                     # print(len(dtargets))
 
                     # weights to be updated
-                    updated_weights = ['conv1', 'conv2' ,'conv3' ,'conv4' ,'w5']
-                    updated_biases = ['b1','b2','b3','b4','b5']
-                    grads_weights = [tf.gradients(dtargets[i], weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
+                    # updated_weights = ['conv1', 'conv2' ,'conv3' ,'conv4' ,'w5']
+                    # updated_biases = ['b1','b2','b3','b4','b5']
+                    grads_weights = [tf.gradients(dtargets[i], fast_weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
                     print("Before grads_biases")
-                    grads_biases = [tf.gradients(dtargets[i], weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
+                    grads_biases = [tf.gradients(dtargets[i], fast_weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
                     print("After grads_biases")
                     grads = grads_weights + grads_biases
                     updated_parameters = updated_weights + updated_biases
@@ -463,21 +469,43 @@ class MAML_S:
             weights['b'+str(i+1)] = tf.Variable(tf.zeros([self.dim_hidden[i]]))
         weights['w'+str(len(self.dim_hidden)+1)] = tf.Variable(tf.truncated_normal([self.dim_hidden[-1], self.dim_output], stddev=0.01))
         weights['b'+str(len(self.dim_hidden)+1)] = tf.Variable(tf.zeros([self.dim_output]))
+
+        # backward weights
+        weights['w'+str(len(self.dim_hidden)+2)] = tf.Variable(tf.truncated_normal([self.dim_output, self.dim_hidden[-1]], stddev=0.01))
+        weights['b'+str(len(self.dim_hidden)+2)] = tf.Variable(tf.zeros([self.dim_hidden[-1]]))
+        for i in range(len(self.dim_hidden)+2, 2*(len(self.dim_hidden)+1)-1):
+            weights['w'+str(i+1)] = tf.Variable(tf.truncated_normal([self.dim_hidden[i-1-len(self.dim_hidden)], self.dim_hidden[i-2-len(self.dim_hidden)]], stddev=0.01))
+            weights['b'+str(i+1)] = tf.Variable(tf.zeros([self.dim_hidden[i-2-len(self.dim_hidden)]]))
+        weights['w'+str(2* (len(self.dim_hidden)+1))] = tf.Variable(tf.truncated_normal([self.dim_hidden[0], self.dim_input], stddev=0.01))
+        weights['b'+str(2* (len(self.dim_hidden)+1))] = tf.Variable(tf.zeros([self.dim_input]))
+        print("**********weights length********: {}".format((list(weights.keys()))))
         return weights
 
     def forward_fc(self, inp, weights, reuse=False):
+        output = [inp]
         hidden = normalize(tf.matmul(inp, weights['w1']) + weights['b1'], activation=tf.nn.relu, reuse=reuse, scope='0')
+        output.append(hidden)
         for i in range(1,len(self.dim_hidden)):
             hidden = normalize(tf.matmul(hidden, weights['w'+str(i+1)]) + weights['b'+str(i+1)], activation=tf.nn.relu, reuse=reuse, scope=str(i+1))
-        return tf.matmul(hidden, weights['w'+str(len(self.dim_hidden)+1)]) + weights['b'+str(len(self.dim_hidden)+1)]
+            output.append(hidden)
+        hidden = tf.matmul(hidden, weights['w'+str(len(self.dim_hidden)+1)]) + weights['b'+str(len(self.dim_hidden)+1)]
+        output.append(hidden)
+        return output
+        # return tf.matmul(hidden, weights['w'+str(len(self.dim_hidden)+1)]) + weights['b'+str(len(self.dim_hidden)+1)]
 
     # User Added
-    def backward_fc(self, inp, weights, reuse=False):
-        backward_count = self.dim_hidden
+    def backward_fc(self, inp, weights, reuse=False, scope='', forward_activations=None):
+        output = [inp]
+        backward_count = len(self.dim_hidden)+2
         hidden = normalize(tf.matmul(inp, weights['w' + str(backward_count)]) + weights['b' + str(backward_count)], activation=tf.nn.relu, reuse=reuse, scope='0')
-        for i in range(len(self.dim_hidden), 2 * len(self.dim_hidden)):
+        output.insert(0,hidden)
+        for i in range(len(self.dim_hidden)+2, 2*(len(self.dim_hidden)+1)-1):
             hidden = normalize(tf.matmul(hidden, weights['w'+str(i+1)]) + weights['b'+str(i+1)], activation=tf.nn.relu, reuse=reuse, scope=str(i+1))
-        return tf.matmul(hidden, weights['w'+str(len(self.dim_hidden)+1)]) + weights['b'+str(len(self.dim_hidden)+1)]
+            output.insert(0,hidden)
+        hidden = tf.matmul(hidden, weights['w'+str(2*(len(self.dim_hidden)+1))]) + weights['b'+str(2*(len(self.dim_hidden)+1))]
+        output.insert(0,hidden)
+        return output
+        # return tf.matmul(hidden, weights['w'+str(2*(len(self.dim_hidden)+1))]) + weights['b'+str(2*(len(self.dim_hidden)+1))]
 
 
     def construct_conv_weights(self):
