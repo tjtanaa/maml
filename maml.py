@@ -309,7 +309,7 @@ class MAML_S:
 
                 # grads = tf.gradients(task_lossa, list(weights.values()))
                 last_layer_grad = tf.gradients(task_lossa, task_outputa[-1])
-                last_layer_target = task_outputa[-1] -self.update_lr*last_layer_grad[0]
+                last_layer_target = task_outputa[-1] - self.update_lr*last_layer_grad[0]
                 targets = self.backward(last_layer_target, weights, reuse=reuse, forward_activations=task_outputa)
                 # print('len of targets: {}'.format(len(targets)))
                 dtargets = [self.loss_func(task_outputa[i], targets[i]) for i in range(len(task_outputa))]
@@ -323,14 +323,18 @@ class MAML_S:
                     updated_biases = ['b1','b2','b3','b4','b5']
                 else:
                     updated_weights = ['w1', 'w2' ,'w3']
+                    updated_bweights = ['w5', 'w4']
                     updated_biases = ['b1','b2','b3']
-                print("@@@@@@@@@@@weights.keys(): {}".format(list(weights.keys())))
+                    updated_bbiases = ['b5', 'b4']
+                # print("weights.keys(): {}".format(list(weights.keys())))
                 grads_weights = [tf.gradients(dtargets[i], weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
-                print("Before grads_biases")
+                grads_bweights = [tf.gradients(dtargets[i], weights[updated_bweights[i-1]]) for i in range(1,len(dtargets)-1)]
+                # print("Before grads_biases")
                 grads_biases = [tf.gradients(dtargets[i], weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
-                print("After grads_biases")
-                grads = grads_weights + grads_biases
-                updated_parameters = updated_weights + updated_biases
+                grads_bbiases = [tf.gradients(dtargets[i], weights[updated_bbiases[i-1]]) for i in range(1,len(dtargets)-1)]
+                # print("After grads_biases")
+                grads = grads_weights + grads_biases + grads_bweights + grads_bbiases
+                updated_parameters = updated_weights + updated_biases + updated_bweights + updated_bbiases
                 if FLAGS.stop_grad:
                     grads = [tf.stop_gradient(grad) for grad in grads]
                 # gradients = dict(zip(weights.keys(), grads))
@@ -338,7 +342,7 @@ class MAML_S:
                 print(gradients)
                 # fast_weights = dict(zip(weights.keys(), [tf.add(weights[key], tf.scalar_mul(-self.update_lr, gradients[key])) if key in updated_parameters else weights[key] for key in weights.keys()]))
                 fast_weights = dict(zip(weights.keys(), [weights[key] - self.update_lr*gradients[key][0] if key in updated_parameters else weights[key] for key in weights.keys()]))
-
+                # print("fastweights.keys(): {}".format(fast_weights.keys()))
                 output = self.forward(inputb, fast_weights, reuse=True)
                 task_outputbs.append(output[-1])
                 task_lossesb.append(self.loss_func(output[-1], labelb))
@@ -355,29 +359,42 @@ class MAML_S:
                     # weights to be updated
                     # updated_weights = ['conv1', 'conv2' ,'conv3' ,'conv4' ,'w5']
                     # updated_biases = ['b1','b2','b3','b4','b5']
+
+                    # print("weights.keys(): {}".format(list(weights.keys())))
                     grads_weights = [tf.gradients(dtargets[i], fast_weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
-                    print("Before grads_biases")
+                    grads_bweights = [tf.gradients(dtargets[i], fast_weights[updated_bweights[i-1]]) for i in range(1,len(dtargets)-1)]
+                    # print("Before grads_biases")
                     grads_biases = [tf.gradients(dtargets[i], fast_weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
-                    print("After grads_biases")
-                    grads = grads_weights + grads_biases
-                    updated_parameters = updated_weights + updated_biases
+                    grads_bbiases = [tf.gradients(dtargets[i], fast_weights[updated_bbiases[i-1]]) for i in range(1,len(dtargets)-1)]
+                    # print("After grads_biases")
+                    grads = grads_weights + grads_biases + grads_bweights + grads_bbiases
+                    updated_parameters = updated_weights + updated_biases + updated_bweights + updated_bbiases
+
+
+
+                    # grads_weights = [tf.gradients(dtargets[i], fast_weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
+                    # print("Before grads_biases")
+                    # grads_biases = [tf.gradients(dtargets[i], fast_weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
+                    # print("After grads_biases")
+                    # grads = grads_weights + grads_biases
+                    # updated_parameters = updated_weights + updated_biases
                     if FLAGS.stop_grad:
                         grads = [tf.stop_gradient(grad) for grad in grads]
                     # gradients = dict(zip(weights.keys(), grads))
-                    print('Before zipping gradients')
+                    # print('Before zipping gradients')
                     gradients = dict(zip(updated_parameters, grads))
                     # print(gradients)
                     # fast_weights = dict(zip(weights.keys(), [tf.add(weights[key], tf.scalar_mul(-self.update_lr, gradients[key])) if key in updated_parameters else weights[key] for key in weights.keys()]))
-                    print('Before computing fast_weights')
+                    # print('Before computing fast_weights')
                     fast_weights = dict(zip(fast_weights.keys(), [fast_weights[key] - self.update_lr*gradients[key][0] if key in updated_parameters else fast_weights[key] for key in fast_weights.keys()]))
-                    print('Before inputb forward pass')
+                    # print('Before inputb forward pass')
                     output = self.forward(inputb, fast_weights, reuse=True)
                     task_outputbs.append(output[-1])
-                    print('Before computing losses on dataset B')
+                    # print('Before computing losses on dataset B')
                     task_lossesb.append(self.loss_func(output[-1], labelb))
-                    print('After computing losses on dataset B')
+                    # print('After computing losses on dataset B')
 
-
+                    ## ORIGINAL CODE
                     # loss = self.loss_func(self.forward(inputa, fast_weights, reuse=True)[-1], labela)
                     # grads = tf.gradients(loss, list(fast_weights.values()))
                     # if FLAGS.stop_grad:
@@ -476,9 +493,10 @@ class MAML_S:
         for i in range(len(self.dim_hidden)+2, 2*(len(self.dim_hidden)+1)-1):
             weights['w'+str(i+1)] = tf.Variable(tf.truncated_normal([self.dim_hidden[i-1-len(self.dim_hidden)], self.dim_hidden[i-2-len(self.dim_hidden)]], stddev=0.01))
             weights['b'+str(i+1)] = tf.Variable(tf.zeros([self.dim_hidden[i-2-len(self.dim_hidden)]]))
-        weights['w'+str(2* (len(self.dim_hidden)+1))] = tf.Variable(tf.truncated_normal([self.dim_hidden[0], self.dim_input], stddev=0.01))
-        weights['b'+str(2* (len(self.dim_hidden)+1))] = tf.Variable(tf.zeros([self.dim_input]))
-        print("**********weights length********: {}".format((list(weights.keys()))))
+        weights['w6'] = tf.Variable(tf.truncated_normal([self.dim_hidden[0], self.dim_input], stddev=0.01))
+        weights['b6'] = tf.Variable(tf.zeros([self.dim_input]))
+        # print("**********weights length********: {}".format((list(weights.keys()))))
+        # print("**********weights values********: {}".format((list(weights.values()))))
         return weights
 
     def forward_fc(self, inp, weights, reuse=False):
@@ -497,13 +515,24 @@ class MAML_S:
     def backward_fc(self, inp, weights, reuse=False, scope='', forward_activations=None):
         output = [inp]
         backward_count = len(self.dim_hidden)+2
-        hidden = normalize(tf.matmul(inp, weights['w' + str(backward_count)]) + weights['b' + str(backward_count)], activation=tf.nn.relu, reuse=reuse, scope='0')
+        h_hat = normalize(tf.matmul(inp, weights['w' + str(backward_count)]) + weights['b' + str(backward_count)], activation=tf.nn.relu, reuse=reuse, scope='4')
+        h = normalize(tf.matmul(forward_activations[-1], weights['w' + str(backward_count)]) + weights['b' + str(backward_count)], activation=tf.nn.relu, reuse=reuse, scope='4') 
+        hidden = forward_activations[-2] - h + h_hat
         output.insert(0,hidden)
         for i in range(len(self.dim_hidden)+2, 2*(len(self.dim_hidden)+1)-1):
-            hidden = normalize(tf.matmul(hidden, weights['w'+str(i+1)]) + weights['b'+str(i+1)], activation=tf.nn.relu, reuse=reuse, scope=str(i+1))
+            # hidden = normalize(tf.matmul(hidden, weights['w'+str(i+1)]) + weights['b'+str(i+1)], activation=tf.nn.relu, reuse=reuse, scope=str(i+1))
+            h_hat = normalize(tf.matmul(hidden, weights['w' + str(i+1)]) + weights['b' + str(i+1)], activation=tf.nn.relu, reuse=reuse, scope=str(i+1))
+            h = normalize(tf.matmul(forward_activations[i - 2*(len(self.dim_hidden)+1)], weights['w' + str(i+1)]) + weights['b' + str(i+1)], activation=tf.nn.relu, reuse=reuse, scope='0') 
+            hidden = forward_activations[i - 2*(len(self.dim_hidden)+1) -1] - h + h_hat
             output.insert(0,hidden)
-        hidden = tf.matmul(hidden, weights['w'+str(2*(len(self.dim_hidden)+1))]) + weights['b'+str(2*(len(self.dim_hidden)+1))]
+
+        h_hat = normalize(tf.matmul(hidden, weights['w' + str(2*(len(self.dim_hidden)+1))]) + weights['b' + str(2*(len(self.dim_hidden)+1))], activation=tf.nn.relu, reuse=reuse, scope=str(2*(len(self.dim_hidden)+1)))
+        h = normalize(tf.matmul(forward_activations[1], weights['w' + str(2*(len(self.dim_hidden)+1))]) + weights['b' + str(2*(len(self.dim_hidden)+1))], activation=tf.nn.relu, reuse=reuse, scope=str(2*(len(self.dim_hidden)+1))) 
+        hidden = forward_activations[0] - h + h_hat
         output.insert(0,hidden)
+
+        # hidden = tf.matmul(hidden, weights['w'+str(2*(len(self.dim_hidden)+1))]) + weights['b'+str(2*(len(self.dim_hidden)+1))]
+        # output.insert(0,hidden)
         return output
         # return tf.matmul(hidden, weights['w'+str(2*(len(self.dim_hidden)+1))]) + weights['b'+str(2*(len(self.dim_hidden)+1))]
 
