@@ -327,11 +327,11 @@ class MAML_S:
                     updated_biases = ['b1','b2','b3']
                     updated_bbiases = ['b5', 'b4']
                 # print("weights.keys(): {}".format(list(weights.keys())))
-                grads_weights = [tf.gradients(dtargets[i], weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
-                grads_bweights = [tf.gradients(dtargets[i], weights[updated_bweights[i-1]]) for i in range(1,len(dtargets)-1)]
+                grads_weights = [tf.gradients(dtargets[i], weights[updated_weights[i-1]], stop_gradients=[targets[i], task_outputa[i-1]]) for i in range(1,len(dtargets))]
+                grads_bweights = [tf.gradients(dtargets[i], weights[updated_bweights[i-1]], stop_gradients=[task_outputa[i]]) for i in range(1,len(dtargets)-1)]
                 # print("Before grads_biases")
-                grads_biases = [tf.gradients(dtargets[i], weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
-                grads_bbiases = [tf.gradients(dtargets[i], weights[updated_bbiases[i-1]]) for i in range(1,len(dtargets)-1)]
+                grads_biases = [tf.gradients(dtargets[i], weights[updated_biases[i-1]], stop_gradients=[targets[i], task_outputa[i-1]]) for i in range(1,len(dtargets))]
+                grads_bbiases = [tf.gradients(dtargets[i], weights[updated_bbiases[i-1]], stop_gradients=[task_outputa[i]]) for i in range(1,len(dtargets)-1)]
                 # print("After grads_biases")
                 grads = grads_weights + grads_biases + grads_bweights + grads_bbiases
                 updated_parameters = updated_weights + updated_biases + updated_bweights + updated_bbiases
@@ -361,11 +361,11 @@ class MAML_S:
                     # updated_biases = ['b1','b2','b3','b4','b5']
 
                     # print("weights.keys(): {}".format(list(weights.keys())))
-                    grads_weights = [tf.gradients(dtargets[i], fast_weights[updated_weights[i-1]]) for i in range(1,len(dtargets))]
-                    grads_bweights = [tf.gradients(dtargets[i], fast_weights[updated_bweights[i-1]]) for i in range(1,len(dtargets)-1)]
+                    grads_weights = [tf.gradients(dtargets[i], fast_weights[updated_weights[i-1]], stop_gradients=[targets[i], task_outputa[i-1]]) for i in range(1,len(dtargets))]
+                    grads_bweights = [tf.gradients(dtargets[i], fast_weights[updated_bweights[i-1]], stop_gradients=[task_outputa[i]]) for i in range(1,len(dtargets)-1)]
                     # print("Before grads_biases")
-                    grads_biases = [tf.gradients(dtargets[i], fast_weights[updated_biases[i-1]]) for i in range(1,len(dtargets))]
-                    grads_bbiases = [tf.gradients(dtargets[i], fast_weights[updated_bbiases[i-1]]) for i in range(1,len(dtargets)-1)]
+                    grads_biases = [tf.gradients(dtargets[i], fast_weights[updated_biases[i-1]], stop_gradients=[targets[i], task_outputa[i-1]]) for i in range(1,len(dtargets))]
+                    grads_bbiases = [tf.gradients(dtargets[i], fast_weights[updated_bbiases[i-1]], stop_gradients=[task_outputa[i]]) for i in range(1,len(dtargets)-1)]
                     # print("After grads_biases")
                     grads = grads_weights + grads_biases + grads_bweights + grads_bbiases
                     updated_parameters = updated_weights + updated_biases + updated_bweights + updated_bbiases
